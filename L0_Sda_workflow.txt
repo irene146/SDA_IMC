@@ -120,7 +120,8 @@ def water_watcher_flag(df_water_watcher, df_picarro)
 
 
 #start processing files
-
+#check there if there is hourly files of everything. If there is hourly files of everythng but the cr800 still continue else, 
+    dont process hourly files wth missing stuff
 #assuming same length of flies: 
 
 for i in range(len(cr6_name)): 
@@ -137,14 +138,16 @@ for i in range(len(cr6_name)):
     df_pml_sonic = split df_cr6
     df_ship_sonic = split df_cr6
     #calculate mean wd for both of them, then substract  
-    df_pml_sonic_corrected = df_pml_sonic + substracted wd
+    df_pml_sonic_corrected = df_pml_sonic + substracted wd 
+    #do this to two horizontal wind velocities, the 2 horizontal linear accelerations, and the 2 horizontal rotations
+    #be careful with sign! 
 
-    #interpolate ships data using picarros timestamp 
+    #interpolate ships data using cr6 timestamp 
     #containing lat lon speed, gyro? 
     df_ship_interpolated
     !!! be careful with angles 
 
-    #interpolate PML and ships sonic data to picarros timestamp
+    #interpolate picarro data timestamp to cr6
     #make sure each df contains U	V	W	sonicT	X_accel	Y_accel	Z_accel	X_rot	Y_rot	Z_rot	smg_knots	heading_deg	shipwindspeed	shipwinddirection
     df_PML_sonic_interpolated
     df_ship_sonic_interpolated 
