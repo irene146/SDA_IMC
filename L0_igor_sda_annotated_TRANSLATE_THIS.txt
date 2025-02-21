@@ -1,0 +1,405 @@
+
+
+function LoadGPS() 
+	NewPath /O/Q/M="Choose folder containing ship's GPS data" RawFilePath # file contains lat lon and speed, 
+
+	PathInfo RawFilePath			// Check to see if user created the path.  Returns path in S_Path variable.
+	if (V_flag==0)
+		return -1					// User cancelled process.
+	endif
+	
+	String FileList = IndexedFile(RawFilePath, -1, ".txt")	
+
+	FileList = SortList(FileList, ";", 0)
+
+	Variable ii, jj
+	string tempstr
+
+	for(ii=0;ii<ItemsInList(FileList);ii+=1) #hourly files 
+
+		String RawFile2Load = StringFromList(ii, FileList)							// Get file name from list
+
+		LoadWave/J/D/A/Q/W/K=2/V={"\t, "," $",0,0}/L={0,0,0,0,9}/R={English,2,2,2,2,"Year-Month-DayOfMonth",40}/P=RawFilePath RawFile2Load		#datetime // Load data from file.  Overwrite old variables if they exist.
+		// declare loaded waves
+		wave/t wave0, wave1, wave2, wave3, wave4, wave5, wave6, wave7, wave8 #columns of useful data as string
+		Make /o/t/n=(numpnts(wave0)) meas_flag; meas_flag = wave2
+		Make /o/t/n=(numpnts(wave0)) lat_flag; lat_flag = wave5
+		Make /o/t/n=(numpnts(wave0)) lon_flag; lon_flag = wave7
+				
+		// reload data as numeric only #
+		LoadWave/J/D/A/Q/W/K=1/V={"\t, "," $",0,0}/L={0,0,0,0,9}/R={English,2,2,2,2,"Year-Month-DayOfMonth",40}/P=RawFilePath RawFile2Load		// Load data from file.  Overwrite old variables if they exist.
+		Wave wave9, wave10, wave11, wave12, wave13, wave14, wave15, wave16, wave17
+		Duplicate /o wave9, timeGPS
+						
+		Make/d/o/n=(numpnts(wave0)) Lat, Lon, SOG
+		Lat = nan
+		Lon = nan
+		SOG = nan
+		
+
+		// pick out lat/lon/SOG data #calculations to convert to lat lons 
+		for (jj=0; jj<numpnts(wave0); jj+=1)
+		tempstr = meas_flag[jj]
+			if (stringmatch(tempstr, "$INGGA")==1) #looking for this specific string 
+				lat[jj] = wave13[jj]/100 
+				lon[jj] = wave15[jj]/100				
+			endif
+
+			if (stringmatch(tempstr, "$INVTG")==1) 
+				SOG[jj] = wave16[jj]		// knots #speed over groud 
+			endif
+		
+		endfor 
+		
+		// convert lat/lon format
+		Duplicate /o lat, Lat_deg, Lon_deg		
+		Lat_deg = floor(lat)+ (lat - floor(lat))*100/60
+		Lon_deg = floor(lon)+ (lon - floor(lon))*100/60
+
+		// add negative sign for south latitude and west longitude
+		for (jj=0; jj<numpnts(wave0); jj+=1)
+		
+		tempstr = lat_flag[jj]
+			if (stringmatch(tempstr, "S")==1) # south, add -ve sign 
+				Lat_deg[jj] = -Lat_deg[jj]
+			endif
+
+		tempstr = lon_flag[jj]
+			if (stringmatch(tempstr, "W")==1)
+				Lon_deg[jj] = -Lon_deg[jj]
+			endif
+		endfor 
+		
+		#prev,minute long files, now seconds 
+		Concatenate /NP {timeGPS}, Time_GPS_1min							// Concatnate to results to be saved
+		Concatenate /NP {Lat_deg}, lat_1min							// Concatnate to results to be saved
+		Concatenate /NP {Lon_deg}, lon_1min								// Concatnate to results to be saved
+		Concatenate /NP {SOG}, SOG_1min								// Concatnate to results to be saved
+
+		KillWaves/z wave0, wave1, wave2, wave3, wave4, wave5, wave6, wave7, wave8, wave9, wave10
+		KillWaves/z wave11, wave12, wave13, wave14, wave15, wave16, wave17, wave18, wave19, time1s
+		KillWaves/z wave20, wave21, wave22
+		killwaves/z lat, lat_flag, lon, lon_flag, meas_flag, timegps, sog, lat_deg, lon_deg
+	endfor
+
+end
+
+
+function LoadGyro()
+#compass, gyro, whcih way ship is tilting, same as previous file (GPS), gives you the heading 
+	NewPath /O/Q/M="Choose folder containing ship's gyro data" RawFilePath
+	PathInfo RawFilePath			// Check to see if user created the path.  Returns path in S_Path variable.
+	if (V_flag==0)
+		return -1					// User cancelled process.
+	endif
+	
+	String FileList = IndexedFile(RawFilePath, -1, ".txt")	
+
+	FileList = SortList(FileList, ";", 0)
+
+	Variable ii, jj
+	string tempstr
+
+	for(ii=0;ii<ItemsInList(FileList);ii+=1)
+
+		String RawFile2Load = StringFromList(ii, FileList)							// Get file name from list
+
+		LoadWave/J/D/A/Q/W/K=2/V={"\t, "," $",0,0}/L={0,0,0,0,5}/R={English,2,2,2,2,"Year-Month-DayOfMonth",40}/P=RawFilePath RawFile2Load		// Load data from file.  Overwrite old variables if they exist.
+		// declare loaded waves
+		wave/t wave0, wave1, wave2, wave3, wave4
+		Make /o/t/n=(numpnts(wave0)) meas_flag; meas_flag = wave2
+				
+		// reload data as numeric only
+		LoadWave/J/D/A/Q/W/K=1/V={"\t, "," $",0,0}/L={0,0,0,0,5}/R={English,2,2,2,2,"Year-Month-DayOfMonth",40}/P=RawFilePath RawFile2Load		// Load data from file.  Overwrite old variables if they exist.
+		Wave wave5, wave6, wave7, wave8, wave9
+		Duplicate /o wave5, timegyro
+						
+		Make/d/o/n=(numpnts(wave0)) heading
+		heading = nan		
+
+		// pick out lat/lon/SOG data
+		for (jj=0; jj<numpnts(wave0); jj+=1)
+		tempstr = meas_flag[jj]
+			if (stringmatch(tempstr, "$INHDT")==1)
+				heading[jj] = wave8[jj]
+			endif
+
+		endfor 
+				
+		Concatenate /NP {timegyro}, Time_gyro_1min							// Concatnate to results to be saved
+		Concatenate /NP {heading}, heading_1min							// Concatnate to results to be saved
+
+		KillWaves/z wave0, wave1, wave2, wave3, wave4, wave5, wave6, wave7, wave8, wave9, wave10
+		killwaves/z timegyro, heading, meas_flag
+	endfor
+
+end #merge two previous functions 
+
+
+
+########generate L0 
+
+Function PrepareFiles4MotCorr_SDA()		// combine wind and motion files, add ship's heading and speed
+												// in preparation for motion correction script
+
+	KillPath/A/Z							// Clear existing paths
+	
+	# Ask user to locate folder with wind data...
+	NewPath /O/Q/M="Choose folder containing Metek winds files" WindFilePath
+	PathInfo WindFilePath			// Check to see if user created the path.  Returns path in S_Path variable.
+	if (V_flag==0)
+		return -1					// User cancelled process.
+	endif
+		
+	//	Ask user to locate folder for destination files...
+	NewPath /O/Q/M="Choose folder to save data files" SaveFilePath
+	PathInfo SaveFilePath			// Check to see if user created the path.  Returns path in S_Path variable.
+	if (V_flag==0)
+		return -1					// User cancelled process.
+	endif
+	
+	Variable /G MotionSourceIndex # to choose betw wind data, PML or ship, case 1 and case 2 later on in the code 
+//	MotionSourceIndex = 1 // PML sonic
+	MotionSourceIndex = 2 // Ship sonic
+
+	Wave Heading_1min, Time_gyro_1min, Time_GPS_1min, SOG_1min #read in teh files you have just read 
+	Duplicate /o Heading_1min, Heading_unwrap
+	Unwrap 360, Heading_unwrap, #stop interpolation fro things like 1-356. will interpolate shop data to 10Hz 
+	
+	//	Create list of files to be processed...
+	// needs to be the same number of files in WindFileList and MotionFileList		
+	String WindFileList = IndexedFile(WindFilePath, -1, ".dat")	// This indexes ALL dat files in the folder.
+	WindFileList = SortList(WindFileList, ";", 0)
+
+	//	Begin loop to process all files in the folder...
+	Variable ii, jj
+	Variable firstgoodpt, lastgoodpt, num2delete
+	Variable startime, endtime, NumDataPts
+	string tempstr
+#read in CR6
+	for(ii=0;ii<ItemsInList(WindFileList);ii+=1)
+		String WindFile2Load = StringFromList(ii, WindFileList)							// Get file name from list
+		LoadWave/J/D/W/K=0/A/O/Q/V={"\t, "," $",0,0}/L={4,5,0,0,0}/R={English,2,2,2,2,"Year-Month-DayOfMonth",40}/P=WindFilePath WindFile2Load	// Load data from file.  Overwrite old variables if they exist.
+		// declare loaded waves
+		Wave wave1, wave2, wave3, wave4, wave5, wave6, wave7, wave8, wave9, wave10
+		Wave wave11, wave12, wave13, wave14, wave15
+		wave/t wave0
+		duplicate /o wave1, timePC
+		duplicate /o wave2, year, month, day
+		
+		for (jj=0; jj<numpnts(wave0); jj+=1)
+			tempstr = wave0[jj]
+			year[jj] = str2num(tempstr[1, 4])
+			month[jj] = str2num(tempstr[6, 7])
+			day[jj] = str2num(tempstr[9, 10])	
+		
+		endfor
+		
+		timePC+=date2secs(year, month, day)
+		#unit conversions, similar to python functions 
+		// starboard motion
+		duplicate /o wave6, Xrot; Xrot=Xrot/1000/pi*180			// in deg/s
+		duplicate /o wave7, Yrot; Yrot=Yrot/1000/pi*180		// in deg/s
+		duplicate /o wave8, Zrot; Zrot=Zrot/1000/pi*180			// in deg/s
+		duplicate /o wave9, Xaccel; Xaccel/=-1000	// in g
+		duplicate /o wave10, Yaccel; Yaccel/=-1000	// in g
+		duplicate /o wave11, Zaccel; Zaccel/=-1000	// in g
+			
+		switch(MotionSourceIndex)												// numeric switch
+		case 1:
+			// PML sonic # mmotion sensor and snoic is mounted here, can calculate offset between the two sonics as the diffrence between wind direction (moved bwtween the cruise), ship sonic might be better 
+			// U, V, W; convert from cm/s to m/s
+			Duplicate /o Wave2, V_raw; V_raw/=-100		// x direction, cm/s; also reverse polarity here
+			Duplicate /o Wave3, U_raw; U_raw/=100		// y direction, cm/s
+			Duplicate /o Wave4, W_raw; W_raw/=100		// z direction, cm/s
+			// sonic sonic temperature * 100
+			Duplicate /O Wave5, sonicT_raw; sonicT_raw/=100	// deg C
+			break
+
+		case 2:		
+			// Ship sonic
+
+			///////////////// !!! temporary correction of ship Metek data logging , can ignore this, no longer a problem 
+			duplicate /o wave12, wave12o
+			wave12 = (wave12o==0 && wave15 <400)?wave13[p]:wave12[p]
+			wave13 = (wave12o==0 && wave15 <400)?wave14[p]*-1:wave13[p]
+			wave14 = (wave12o==0 && wave15 <400)?wave15[p]:wave14[p]
+			killwaves wave12o
+			/////////////////////
+	
+			// U, V, W; convert from cm/s to m/s
+			Duplicate /o Wave12, V_raw; V_raw/=-100		// x direction, cm/s; also reverse polarity here
+			Duplicate /o Wave13, U_raw; U_raw/=100		// y direction, cm/s
+			Duplicate /o Wave14, W_raw; W_raw/=100		// z direction, cm/s
+			// sonic sonic temperature * 100
+			Duplicate /O Wave15, sonicT_raw; sonicT_raw/=100	// deg C
+
+			break
+		endswitch					
+
+		Killwaves /z wave0, wave1, wave2, wave3, wave4, wave5, wave6, wave7, wave8, wave9, wave10
+		Killwaves /z wave11, wave12, wave13, wave14, wave15, wave16, wave17, wave18, wave19
+				
+		Duplicate /o timePC, time10Hz
+
+		// There are sometimes single-point noise spikes in the sonic data # filter for digital spikes 
+		// nan out data beyond 5 sigma
+		Wavestats/Q U_raw
+		U_raw *= (abs(U_raw - v_avg)<5*v_sdev)?1:nan
+		Wavestats/Q V_raw
+		V_raw *= (abs(V_raw - v_avg)<5*v_sdev)?1:nan
+		Wavestats/Q W_raw
+		W_raw *= (abs(W_raw - v_avg)<5*v_sdev)?1:nan
+		Wavestats/Q sonicT_raw
+		sonicT_raw *= (abs(sonicT_raw - v_avg)<5*v_sdev)?1:nan
+
+		// now interpolate raw U, V, W, sonicT tand fill in the occasional NaNs
+		Interpolate2/T=1/E=2/I=3/Y=U/X=time10Hz timePC, U_raw
+		Interpolate2/T=1/E=2/I=3/Y=V/X=time10Hz timePC, V_raw
+		Interpolate2/T=1/E=2/I=3/Y=W/X=time10Hz timePC, W_raw
+		Interpolate2/T=1/E=2/I=3/Y=sonicT/X=time10Hz timePC, sonicT_raw
+				
+		Killwaves U_raw, V_raw, W_raw, sonicT_raw
+		
+		// There are sometimes 1 or 2-point noise spikes in the motion data
+		// nan out data beyond 5 sigma
+		Wavestats/Q Zaccel
+		Zaccel *= (abs(Zaccel - v_avg)<5*v_sdev)?1:nan
+		Wavestats/Q Yaccel
+		Yaccel *= (abs(Yaccel - v_avg)<5*v_sdev)?1:nan
+		Wavestats/Q Xaccel
+		Xaccel *= (abs(Xaccel - v_avg)<5*v_sdev)?1:nan
+		Wavestats/Q Zrot
+		Zrot *= (abs(Zrot - v_avg)<5*v_sdev)?1:nan
+		Wavestats/Q Yrot
+		Yrot *= (abs(Yrot - v_avg)<5*v_sdev)?1:nan
+		Wavestats/Q Xrot
+		Xrot *= (abs(Xrot - v_avg)<5*v_sdev)?1:nan
+				
+		// linearly interpolate motion to wind's sampling frequency
+		Interpolate2/T=1/E=2/I=3/Y=X_accel/X=time10Hz timePC, Xaccel
+		Interpolate2/T=1/E=2/I=3/Y=Y_accel/X=time10Hz timePC, Yaccel
+		Interpolate2/T=1/E=2/I=3/Y=Z_accel/X=time10Hz timePC, Zaccel
+		Interpolate2/T=1/E=2/I=3/Y=X_rot/X=time10Hz timePC, Xrot
+		Interpolate2/T=1/E=2/I=3/Y=Y_rot/X=time10Hz timePC, Yrot
+		Interpolate2/T=1/E=2/I=3/Y=Z_rot/X=time10Hz timePC, Zrot
+
+		Killwaves timePC, Xaccel, Yaccel, Zaccel, Xrot, Yrot, Zrot
+		
+		////// !!!!!!!! temporary rotation of LPMS data by 10 deg, correction by hand, take reference to write axis rotation 
+		duplicate /o X_accel, X_accelp, y_accelp, X_rotp, y_rotp
+		variable betta = 0
+		Variable alpha = -10/180*pi #!!!!! check sign 
+
+
+		#onlyy x and y, vertical not affected 
+		X_accelp = X_accel*Cos(alpha)*cos(betta) + y_accel*sin(alpha)*cos(betta) 
+		y_accelp = -X_accel*sin(alpha) + y_accel*cos(alpha)
+		X_rotp = X_rot*Cos(alpha)*cos(betta) + y_rot*sin(alpha)*cos(betta) 
+		y_rotp = -X_rot*sin(alpha) + y_rot*cos(alpha)
+				
+		X_accel = X_accelp 
+		Y_accel = Y_accelp 
+		x_rot = x_rotp 
+		y_rot = y_rotp 
+		/////////////////////////////
+		VERY IMPORTANT 
+		// wind polarity
+		// +U from stern to bow
+		// +V from starboard to port
+		// +W from down to up
+		
+		// motion polarity (looking at the connector, which is on the downside)
+		// + Zaccel is upwards
+		// + yaccel is to the back (towards the stern)
+		// + xaccel is to the left (towards the port)
+		// + zrot is bow to port, or counterclockwise (when looking down)
+		// + yrot is roll to port, or counterclockwise (when looking from behind)
+		// + xrot is pitch down to bow, or counterclockwise (when looking from the left)
+		
+		// now interpolate ship's navigation data to 10 Hz	
+		// so use Gyro and GPS speed over ground 
+		Interpolate2/T=1/E=2/I=3/Y=smg_knots/X=time10Hz Time_GPS_1min, SOG_1min
+		Interpolate2/T=1/E=2/I=3/Y=heading_deg/X=time10Hz Time_gyro_1min, Heading_unwrap
+
+		// convert back to 0-360
+		heading_deg = mod(heading_deg, 360) 
+		heading_deg=(heading_deg<0)?heading_deg+360:heading_deg
+
+		// make table to save hourly data  #final generation of L0 data 
+		Edit/N=DataTable/W=(169,88,946,429) time10Hz,U,V,W,sonicT, X_accel, Y_accel, Z_accel, X_rot, Y_rot, Z_rot, smg_knots, heading_deg
+		ModifyTable format(Point)=1,format(time10Hz)=3
+		ModifyTable /W=DataTable format(U)=3, digits(U)=2
+		ModifyTable /W=DataTable format(V)=3, digits(V)=2
+		ModifyTable /W=DataTable format(W)=3, digits(W)=2
+		ModifyTable /W=DataTable format(sonicT)=3, digits(sonicT)=2
+		ModifyTable /W=DataTable format(X_accel)=3, digits(X_accel)=3
+		ModifyTable /W=DataTable format(Y_accel)=3, digits(Y_accel)=3
+		ModifyTable /W=DataTable format(Z_accel)=3, digits(Z_accel)=3
+		ModifyTable /W=DataTable format(X_rot)=3, digits(X_rot)=4
+		ModifyTable /W=DataTable format(Y_rot)=3, digits(Y_rot)=4
+		ModifyTable /W=DataTable format(Z_rot)=3, digits(Z_rot)=4
+		ModifyTable /W=DataTable format(smg_knots)=3, digits(smg_knots)=2
+		ModifyTable /W=DataTable format(heading_deg)=3, digits(heading_deg)=2
+
+
+		///////////////// AVERAGE (DECIMATE) DATA ////////////////////
+		// Set factor for decimation
+		Variable Decimate_factor = 600		//  measurement is every 1 s, this gives 1-minute averages
+
+		FDecimateXPosNaNs(time10Hz, "tmp", Decimate_factor, 2)			// This is the decimation function
+		wave tmp														// Declares wave from decimation function
+		Concatenate /NP {tmp}, TimeCR6_1min								// Concatnate to results to be saved
+
+		FDecimateXPosNaNs(U, "tmp", Decimate_factor, 2)			// This is the decimation function
+		wave tmp														// Declares wave from decimation function
+		Concatenate /NP {tmp}, U1min								// Concatnate to results to be saved
+		
+		FDecimateXPosNaNs(V, "tmp", Decimate_factor, 2)			// This is the decimation function
+		wave tmp														// Declares wave from decimation function
+		Concatenate /NP {tmp}, V1min								// Concatnate to results to be saved
+
+		FDecimateXPosNaNs(W, "tmp", Decimate_factor, 2)			// This is the decimation function
+		wave tmp														// Declares wave from decimation function
+		Concatenate /NP {tmp}, W1min								// Concatnate to results to be saved
+		
+		
+		string date_str = secs2date(time10Hz[0], -2)
+		string year_str = date_str[0,3]
+		string month_str = date_str[5,6]
+		string day_str = date_str[8,9]
+		string time_str = secs2time(time10Hz[0], 2)
+		string hour_str = time_str[0,1]
+		string min_str = time_str[3,4]
+
+		// if file starts at 59 min past the hour (e.g. 11:59), name the file for next hour (e.g. 12:00) instead		
+		if (str2num(min_str)==59)
+			variable temp_hour = str2num(hour_str) + 1
+			if (temp_hour>=10)
+				hour_str = num2str(temp_hour)
+			elseif(temp_hour<10)
+				hour_str = "0"+num2str(temp_hour)
+			endif
+		endif
+		
+		// if hour = 24; set to 0 and increase the day
+		if (str2num(hour_str)==24)
+			variable temp_day = str2num(day_str) + 1
+			if (temp_day>=10)
+				day_str = num2str(temp_day)
+			elseif(temp_day<10)
+				day_str = "0"+num2str(temp_day)
+			endif
+			hour_str = "00"
+		endif
+		
+		String SaveName = "WindMotion" + year_str+month_str+day_str+hour_str + "PlusShip.txt"
+		String SaveList = "time10Hz;U;V;W;sonicT;X_accel;Y_accel;Z_accel;X_rot;Y_rot;Z_rot;smg_knots;heading_deg"
+		Save/J/M="\r\n"/W/F/B/P=SaveFilePath  SaveList as SaveName
+		DoWindow /K $"DataTable"
+		Killstrings /A
+		
+		//	Contiinue until all files are done...
+	endfor	
+	
+end	
