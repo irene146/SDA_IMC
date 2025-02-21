@@ -1,0 +1,223 @@
+L0_Sda_workflow 
+
+
+#make new folder to store the processed data
+new_folder_path = os.path.join(data_dir, "L0")
+os.makedirs(new_folder_path, exist_ok=True)
+
+# subfolders to create
+subfolders = ["TimeAdjGases", "PML_WindsForMotcorr", "Ship_WindsForMotcorr"]
+
+# subfolder inside "L0"
+for subfolder in subfolders:
+    os.makedirs(os.path.join(new_folder_path, subfolder), exist_ok=True)
+
+
+########
+#List of files in each data folder
+########
+
+
+def file_name_dir(data_dir):
+    """
+    get the raw EC data file names and directories
+
+    input:  the parent directory of the raw EC data
+    return: the EC data file names (_name) and directories(_dir)
+    
+    """    
+
+    cr6_name = os.listdir(data_dir + '\\cr6')
+    ship_name_name = os.listdir(data_dir + '\\shipdata')
+    metek_name = os.listdir(data_dir + '\\metek')
+    cr800_name = os.listdir(data_dir + '\\cr800')
+    Picarro_name = os.listdir(data_dir + '\\Picarro')
+
+ 
+    return cr6_name,GPS_name,metek_name,cr800_name,Picarro_name
+
+
+#######################
+#Functios to read as pandas df, make sure you have hourly files 
+#######################
+
+
+ def shipdata(filepath)
+    read file
+    index as datetime
+    check if hourly 
+        else
+            read adjacent files 
+            make an hourly dataframe
+    pick only relevant columns 
+    do unit conversions 
+    rerurn  df_ship
+
+
+ def Water_watcher(filepath)
+    read file
+    index as datetime
+    check if hourly 
+        else
+            read adjacent files 
+            make an hourly dataframe
+    return df_water_watcher
+
+def Cr6(filepath) 
+    read file as pandas df
+    read file
+    index as datetime
+    check if hourly 
+        else
+            read adjacent files 
+            make an hourly dataframe
+    do unit conversions
+    change column names to PML and ships sonic 
+    despike to 5sigma, subs for nans 
+    return df_cr6
+    
+def Metek(filepath) 
+    read file as pandas df 
+    index as datetime
+    check if hourly 
+        else
+            read adjacent files 
+            make an hourly dataframe
+    do unit conversions 
+    despike to 5sigma, subs for nans 
+    return df_metek
+
+def picarro(filepath)
+    read file as pandas df 
+        index as datetime
+        check if hourly 
+            else
+                read adjacent files 
+                make an hourly dataframe
+        do unit conversions 
+        add true/false column named is blank based on solenoid vave status 
+    return df_picarro
+
+#once you have hourly files
+
+
+############
+#lagtime and flag 
+###########
+#Correct for lag time
+def lag_time(df_cr6, df_metek, df_picarro)
+    pick a column in metek df
+    find that column on the cr6 
+    lag time = maximum covariance
+   return df_picarro =  df_picarro.index()+ lag_time
+
+
+#water wathcer flag 
+def water_watcher_flag(df_water_watcher, df_picarro)
+    add T/F column in picarro df if water_watcher was on 
+    return df_picarro
+
+
+
+#start processing files
+
+#assuming same length of flies: 
+
+for i in range(len(cr6_name)): 
+    df_ship = shppdata(os.path.join(data_dir, 'ship', ship_name.iloc[i]))
+    df_cr6 = Cr6(os.path.join(data_dir, 'Cr6', cr6_name.iloc[i]))
+    df_metek = metek(os.path.join(data_dir, 'metek', metek_name.iloc[i]))
+    df_picarro = picarro(os.path.join(data_dir, 'picarro', picarr_name.iloc[i]))
+    df_water_watcher = water_watcher(os.path.join(data_dir, 'cr800', cr800_name.iloc[i]))
+
+    df_picarro = lagtime(df_cr6, df_metek, df_picarro)
+    df_picarro = water_watcher_flag(df_water_watcher, df_picarro)
+
+    #angle correction for pml sonic 
+    df_pml_sonic = split df_cr6
+    df_ship_sonic = split df_cr6
+    #calculate mean wd for both of them, then substract  
+    df_pml_sonic_corrected = df_pml_sonic + substracted wd
+
+    #interpolate ships data using picarros timestamp 
+    #containing lat lon speed, gyro? 
+    df_ship_interpolated
+    !!! be careful with angles 
+
+    #interpolate PML and ships sonic data to picarros timestamp
+    #make sure each df contains U	V	W	sonicT	X_accel	Y_accel	Z_accel	X_rot	Y_rot	Z_rot	smg_knots	heading_deg	shipwindspeed	shipwinddirection
+    df_PML_sonic_interpolated
+    df_ship_sonic_interpolated 
+    !!! careful with angles
+
+#save data
+    df_PML_sonic_interpolated.to_csv(
+    os.path.join(output_folder, "PML_WindsForMotcorr", "PML_winds_dateime.txt"),
+    sep="\t",
+    index=False
+    )
+
+    df_ship_sonic_interpolated.to_csv(
+        os.path.join(output_folder, "Ship_WindsForMotcorr", "Ship_Winds_datetime.txt"),
+        sep="\t",
+        index=False
+    )
+
+    df_picarro.to_csv(
+        os.path.join(output_folder, "TimeAdjGases", "picarro_datetime.txt"),
+        sep="\t",
+        index=False
+    )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
